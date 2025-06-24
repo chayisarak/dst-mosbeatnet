@@ -110,15 +110,13 @@ def get_valtest_noise_files(directory):
 
 def get_environment_type(species):
 
-    # print(f"Checking environment for species: {species}")
-
+   
     for env, settings in config.ENVIRONMENTS.items():
         if species in settings["mosquito_species"]:
-            # print(f" Matched Environment: {env} for {species}")
+           
             return env  
 
-    # print("No matching environment found, defaulting to 'urban'")
-    return "urban"
+    return "urban" # Default to urban if no match found
 
 
 def get_noise_files(noise_dir, environment_type):
@@ -140,7 +138,7 @@ def get_noise_files(noise_dir, environment_type):
 
 
 
-def apply_smooth_volume(audio, sr, fade_in_time=1.0, fade_out_time=1.0, method="sigmoid"):
+def apply_smooth_volume(audio, sr, fade_in_time=1.0, fade_out_time=1.0, method="exponential"):
     fade_in_samples = min(max(int(fade_in_time * sr), 1), len(audio) // 2)
     fade_out_samples = min(max(int(fade_out_time * sr), 1), len(audio) // 2)
 
@@ -150,19 +148,13 @@ def apply_smooth_volume(audio, sr, fade_in_time=1.0, fade_out_time=1.0, method="
 
     fade_in_curve = np.ones(fade_in_samples)
     fade_out_curve = np.ones(fade_out_samples)
+         
 
-    if method == "linear":
-        fade_in_curve = np.linspace(0, 1, fade_in_samples)
-        fade_out_curve = np.linspace(1, 0, fade_out_samples)
-
-    elif method == "exponential":
+    if method == "exponential":
         fade_in_curve = (np.exp(np.linspace(0, 4, fade_in_samples)) - 1) / (np.exp(4) - 1)
         fade_out_curve = np.flip(fade_in_curve)
+        # https://numpy.org/doc/2.1/reference/random/generated/numpy.random.exponential.html
 
-    elif method == "sigmoid":
-        x = np.linspace(-6, 6, fade_in_samples)
-        fade_in_curve = 1 / (1 + np.exp(-x))
-        fade_out_curve = np.flip(fade_in_curve)
 
     # Apply fade-in and fade-out
     dynamic_audio = audio.copy()
@@ -171,79 +163,37 @@ def apply_smooth_volume(audio, sr, fade_in_time=1.0, fade_out_time=1.0, method="
 
     return dynamic_audio
 
-# def prep_env(noise_dir, mosquito_dirs, env_target,dataset_type=None):
-#     """
-#     ปรับ prep_env เพื่อบังคับให้เลือก environment ตาม env_target
-#     """
-#     # กรอง mosquito files ที่ตรงกับ env_target โดยใช้ config.ENVIRONMENTS
-#     matching_files = []
-#     for mosquito_dir in mosquito_dirs:
-#         if not os.path.exists(mosquito_dir):
-#             continue
-#         for f in os.listdir(mosquito_dir):
-#             if f.endswith(".wav") and not f.startswith("An.Minimus"):
-#                 species = f.split("_")[0]
-#                 # ตรวจสอบว่า species นี้อยู่ในกลุ่มของ env_target หรือไม่
-#                 if species in config.ENVIRONMENTS[env_target]["mosquito_species"]:
-#                     matching_files.append(os.path.join(mosquito_dir, f))
-#     if not matching_files:
-#         raise ValueError(f"No mosquito files found for environment: {env_target}")
-#     selected_file = random.choice(matching_files)
-#     species = os.path.basename(selected_file).split("_")[0]
-#     env_type = env_target  
-
-#     # # ดึง noise files สำหรับ env_target
-#     # noise_files, noise_path = get_noise_files(noise_dir, env_target)
-#     # noise_file = random.choice(noise_files)
-#     # noise_filepath = os.path.join(noise_path, noise_file)
-#     if dataset_type == "train":
-#         noise_data = get_train_noise_files(noise_dir)
-#     else:
-#         noise_data = get_valtest_noise_files(noise_dir)
-
-#     noise_files = noise_data[env_target]["file_paths"]
-#     noise_file = random.choice(noise_files)
-
-
-
-#     background_noise, _ = librosa.load(noise_file, sr=config.SAMPLING_RATE, mono=True)
-#     total_samples = int(config.AUDIO_DURATION * config.SAMPLING_RATE)
-#     if len(background_noise) > total_samples:
-#         start_idx = random.randint(0, len(background_noise) - total_samples)
-#         background_noise = background_noise[start_idx:start_idx + total_samples]
-#     else:
-#         background_noise = np.pad(background_noise, (0, total_samples - len(background_noise)), mode='wrap')
-
-#     subenv = noise_file.split('_')[2]  
-#     noise_level = config.ENVIRONMENTS[env_target]["noise_level"]
-#     background_noise *= noise_level  
-#     background_noise = np.sign(background_noise) * np.abs(background_noise) ** 0.8
-#     background_noise /= np.max(np.abs(background_noise))
-    
-#     return background_noise, env_type, noise_file, subenv
-
-
 def prep_env(noise_dir, mosquito_dirs, env_target, dataset_type=None, use_gaussian_for_outdoor=False):
     # ---------- (1) สุ่มไฟล์ยุงก่อน ----------
-    matching_files = []
-    for mosquito_dir in mosquito_dirs:
-        if not os.path.exists(mosquito_dir):
-            continue
-        for f in os.listdir(mosquito_dir):
-            if f.endswith(".wav") and not f.startswith("An.Minimus"):
-                species = f.split("_")[0]
-                if species in config.ENVIRONMENTS[env_target]["mosquito_species"]:
-                    matching_files.append((os.path.join(mosquito_dir, f), mosquito_dir))
-
-    if not matching_files:
-        raise ValueError(f"No mosquito files found for environment: {env_target}")
-
-    selected_file, source_dir = random.choice(matching_files)
-    species = os.path.basename(selected_file).split("_")[0]
     env_type = env_target
+    has_mos = mosquito_dirs is not None and len(mosquito_dirs) > 0
+
+
+    if has_mos:
+        matching_files = []
+        for mosquito_dir in mosquito_dirs:
+            if not os.path.exists(mosquito_dir):
+                continue
+            for f in os.listdir(mosquito_dir):
+                if f.endswith(".wav") and not f.startswith("An.Minimus"):
+                    species = f.split("_")[0]
+                    if species in config.ENVIRONMENTS[env_target]["mosquito_species"]:
+                        matching_files.append((os.path.join(mosquito_dir, f), mosquito_dir))
+
+        if not matching_files:
+            raise ValueError(f"No mosquito files found for environment: {env_target}")
+
+        selected_file, source_dir = random.choice(matching_files)
+        species = os.path.basename(selected_file).split("_")[0]
+        env_type = env_target
 
     # ---------- (2) ตรวจว่าไฟล์มาจาก OUTDOOR ----------
-    is_outdoor = config.OUTDOOR_DIR in os.path.abspath(source_dir)
+        is_outdoor = config.OUTDOOR_DIR in os.path.abspath(source_dir)
+
+    else :
+        selected_file = "-"
+        source_dir = "-"
+        is_outdoor = False  # ไม่มี mosquito → ไม่ต้องสนใจ outdoor
 
     # ---------- (3) เลือก background noise ----------
     total_samples = int(config.AUDIO_DURATION * config.SAMPLING_RATE)
@@ -269,13 +219,14 @@ def prep_env(noise_dir, mosquito_dirs, env_target, dataset_type=None, use_gaussi
         else:
             background_noise = np.pad(background_noise, (0, total_samples - len(background_noise)), mode='wrap')
 
-        subenv = noise_file.split('_')[2]
+        filename = os.path.basename(noise_file)  
+        subenv = filename.split('_')[-1].replace('.wav', '')  
         noise_level = config.ENVIRONMENTS[env_target]["noise_level"]
         background_noise *= noise_level
         background_noise = np.sign(background_noise) * np.abs(background_noise) ** 0.8
         background_noise /= np.max(np.abs(background_noise))
 
-    # ---------- ส่งคืนเพิ่ม selected_file ----------
+    
     return background_noise, env_type, noise_file, subenv, selected_file,source_dir
 
 
@@ -339,7 +290,8 @@ def generate_random_pos(duration, min_events=2, min_interval=0.2, mean_interval=
 
     return intervals  
 
-
+def rms(x):
+    return np.sqrt(np.mean(x**2)) # https://hackaudio.com/tutorial-courses/learn-audio-programming-table-of-contents/digital-signal-processing/amplitude/rms-normalization/
 
 def prepare_mos(environment_type, mosquito_dirs, background_noise, event_intervals):
     """
@@ -370,17 +322,22 @@ def prepare_mos(environment_type, mosquito_dirs, background_noise, event_interva
     for (event_type, start, end), snr in zip(event_intervals, snr_values):
         start_sample, end_sample = int(start * config.SAMPLING_RATE), int(end * config.SAMPLING_RATE)
 
+
+
         # กรณีเป็น Noise Event → แค่บันทึก metadata (ไม่ต้องเพิ่มเสียง)
         if event_type == "Noise":
+
             metadata["audio_labels"].append({
                 "event_type": "Noise",
                 "start_time": start,
                 "end_time": end,
-                "species": None,
-                "sex": None,
+                "species": "-",
+                "sex": "-",
                 "label": 'Noise',
                 "snr": None,
-                "environment": environment_type
+                "mosquito_rms": None,
+                "environment": environment_type,
+                "mos_path": "-"
             })
             previous_end = end  # อัปเดตตำแหน่งล่าสุด
             continue  
@@ -408,25 +365,24 @@ def prepare_mos(environment_type, mosquito_dirs, background_noise, event_interva
         mosquito_duration = end_sample - start_sample
         mosquito_sound = np.pad(mosquito_sound[:mosquito_duration], (0, max(0, mosquito_duration - len(mosquito_sound))), 'constant')
 
-        
+        # Fade in/out effect
         mosquito_sound = apply_smooth_volume(mosquito_sound, config.SAMPLING_RATE, fade_in_time=0.7, fade_out_time=0.7, method="exponential")
 
         
-        
-        # คำนวณ Scaling Factor ให้ SNR อยู่ในช่วงที่กำหนด
+    
+        # caculate Scaling Factor in range of SNR
         noise_power = np.mean(background_noise[start_sample:end_sample] ** 2)
         mosquito_power = np.mean(mosquito_sound ** 2)
         snr_linear = 10 ** (snr / 10)
-        scaling_factor = np.sqrt(noise_power * snr_linear / (mosquito_power + 1e-9))
-
         scaling_factor = np.sqrt(noise_power * snr_linear / (mosquito_power + 1e-9))
         mosquito_sound *= scaling_factor * np.random.uniform(0.9, 1.1)
 
 
         mosquito_audio[start_sample:end_sample] += mosquito_sound
+        mosquito_rms = rms(mosquito_sound)
 
 
-        # บันทึก Mosquito Event
+        # save Mosquito Event
         metadata["audio_labels"].append({
             "event_type": "Mosquito",
             "start_time": start,
@@ -435,10 +391,12 @@ def prepare_mos(environment_type, mosquito_dirs, background_noise, event_interva
             "sex": sex,
             "label":f"{species_name}_{sex}",
             "snr": round(snr, 2),
-            "environment": environment_type
+            "mosquito_rms": round(mosquito_rms, 2),
+            "environment": environment_type,
+            "mos_path": mosquito_file
         })
 
-        previous_end = end  # อัปเดตตำแหน่งล่าสุด
+        previous_end = end  # update last end time
 
     return mosquito_audio, metadata
 
@@ -446,7 +404,7 @@ def prepare_mos(environment_type, mosquito_dirs, background_noise, event_interva
 
 
 
-def process_simulation(mosquito_dirs, noise_dir, output_dir, num_simulations,env_target,dataset_type):
+def process_simulation(mosquito_dirs, noise_dir, output_dir, num_simulations,env_target,dataset_type,in_memory=False):
     """
     Generate simulated mosquito sound data.
     """
@@ -461,7 +419,7 @@ def process_simulation(mosquito_dirs, noise_dir, output_dir, num_simulations,env
 
     for i in range(num_simulations):
         background_noise, env_type, noise_file, subenv, selected_file, source_dir = prep_env(
-    noise_dir, mosquito_dirs, env_target, dataset_type, use_gaussian_for_outdoor=True)
+        noise_dir, mosquito_dirs, env_target, dataset_type, use_gaussian_for_outdoor=True)
         mosquito_intervals = generate_random_pos(config.AUDIO_DURATION)
         mosquito_audio, metadata = prepare_mos(env_type, mosquito_dirs, background_noise, mosquito_intervals)
 
@@ -470,16 +428,13 @@ def process_simulation(mosquito_dirs, noise_dir, output_dir, num_simulations,env
 
 
         # ปรับความดังให้คงที่ (Normalize)
-        simulated_audio = normalize(simulated_audio)
-
+        simulated_audio = normalize(simulated_audio) # RMS
+        noise_rms = rms(background_noise)
+        
+        
+        
         # บันทึกไฟล์เสียงที่ถูก Generate
-
-        # เดิม
-# audio_filename = f"{env_type}_simulated_{dataset_type}_{i+1}.wav"
-
-    # แก้ใหม่
         is_outdoor = 'outdoor' in os.path.basename(source_dir).lower()
-
         audio_filename = f"{env_type}_{'outdoor_' if is_outdoor else ''}simulated_{dataset_type}_{i+1}.wav"
         audio_filepath = os.path.join(output_dir, audio_filename)
         sf.write(audio_filepath, simulated_audio, config.SAMPLING_RATE)
@@ -501,29 +456,28 @@ def process_simulation(mosquito_dirs, noise_dir, output_dir, num_simulations,env
                         "start_time": last_mosquito[2],  # Noise เริ่มที่เวลาสิ้นสุดของ Mosquito สุดท้าย
                         "end_time": config.AUDIO_DURATION,
                         "species": None,
-                        
                         "sex": None,
                         "label":"Noise",
                         "snr": None,
+                        "mosquito_rms": None,
                         "environment": env_type
                     })
 
 
         for entry in metadata["audio_labels"]:
-            entry["file_path"]= audio_filepath
+            entry["noise_rms"]= noise_rms
+            entry["simfile_path"]= audio_filepath
             entry["file_name"] = audio_filename
             entry["duration"] = librosa.get_duration(y=simulated_audio, sr=config.SAMPLING_RATE)
             entry["noise_file"] = noise_file
             entry["subenv"] = subenv
-            entry["mos_filepath"] =  selected_file
-            entry["mos_dataset"] = os.path.basename(source_dir)  # 👈 เพิ่มตรงนี้
+            entry["mos_dataset"] = os.path.basename(source_dir) 
 
             metadata_list.append(entry)
 
     metadata_df = pd.DataFrame(metadata_list)
 
     # Save Metadata
-
     # ตรวจสอบว่าไฟล์ยุงมาจาก outdoor หรือไม่
     if 'outdoor' in os.path.basename(source_dir).lower():
         metadata_filename = f"simulation_metadata_{env_target}_outdoor_{dataset_type}.csv"
@@ -536,7 +490,72 @@ def process_simulation(mosquito_dirs, noise_dir, output_dir, num_simulations,env
     # metadata_csv_path = os.path.join(config.METADATA_DIR, f"simulation_metadata_{env_target}_{dataset_type}.csv")
     metadata_df.to_csv(metadata_csv_path, index=False)
 
+    
     print(f"{dataset_type} {env_type} Metadata Preview:")
-    print(metadata_df.head(20))  
+    print(metadata_df.head(20))
 
     return simulated_audio, metadata_df
+
+
+def generate_noise_only_simulations(noise_dir, output_dir, num_simulations, env_target, dataset_type, in_memory=False):
+    os.makedirs(output_dir, exist_ok=True)
+    metadata_list = []
+
+    for i in range(num_simulations):
+        # เตรียม background noise อย่างเดียว (ไม่มี mosquito)
+        background_noise, env_type, noise_file, subenv, _, source_dir = prep_env(
+            noise_dir, mosquito_dirs=[],  # mosquito_dirs ไม่ใช้ แต่ยังต้องส่ง
+            env_target=env_target,
+            dataset_type=dataset_type,
+            use_gaussian_for_outdoor=True
+        )
+
+        total_samples = int(config.AUDIO_DURATION * config.SAMPLING_RATE)
+        simulated_audio = normalize(background_noise)
+        noise_rms = rms(background_noise)
+
+        # ตั้งชื่อไฟล์
+        is_outdoor = 'outdoor' in os.path.basename(source_dir).lower()
+        audio_filename = f"{env_type}_{'outdoor_' if is_outdoor else ''}noiseonly_{dataset_type}_{i+1}.wav"
+        audio_filepath = os.path.join(output_dir, audio_filename)
+
+        # เขียนไฟล์เสียง
+        sf.write(audio_filepath, simulated_audio, config.SAMPLING_RATE)
+
+        # สร้าง metadata entry
+        metadata_list.append({
+            "event_type": "Noise",
+            "start_time": 0.0,
+            "end_time": config.AUDIO_DURATION,
+            "species": "-",
+            "sex": "-",
+            "label": "Noise",
+            "snr": None,
+            "mosquito_rms": None,
+            "noise_rms": noise_rms,
+            "simfile_path": audio_filepath,
+            "file_name": audio_filename,
+            "duration": config.AUDIO_DURATION,
+            "noise_file": noise_file,
+            "subenv": subenv,
+            "mos_dataset": "-",
+            "environment": env_type
+        })
+
+    # บันทึก metadata
+    metadata_df = pd.DataFrame(metadata_list)
+    if not in_memory:
+        metadata_filename = f"simulation_metadata_{env_target}_noiseonly_{dataset_type}.csv"
+        metadata_csv_path = os.path.join(config.METADATA_DIR, metadata_filename)
+        metadata_df.to_csv(metadata_csv_path, index=False)
+        print(f"Saved Noise-Only metadata to: {metadata_csv_path}")
+    else:
+        print("[In-Memory] Skipped saving Noise-Only metadata to disk.")
+
+    print(f"{dataset_type} {env_target} Noise-Only Metadata Preview:")
+    print(metadata_df.head(10))
+
+    return metadata_df
+
+
+
