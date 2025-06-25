@@ -13,7 +13,7 @@ To develop and evaluate mosquito detection models that perform reliably under en
 ## 📁 Datasets
 
 ### 🦟 Wingbeat Dataset
-- Sources: [HumBugDB]([https://humbug.ac.uk/](https://github.com/HumBug-Mosquito/HumBugDB), [MosquitoSong+]([https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0310121])
+- Sources: [HumBugDB](https://github.com/HumBug-Mosquito/HumBugDB), [MosquitoSong+](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0310121)
 - Species:  
   - *Aedes aegypti*, *Culex quinquefasciatus* (Urban)  
   - *Aedes albopictus*, *Anopheles dirus* (Forest)
