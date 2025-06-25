@@ -1,6 +1,6 @@
 # 🦟 A Noise-Resilient Model for Mosquito Species and Sex Detection via Wingbeat Sound Around Noisy Environment
 
-This project presents a simulation-based training and evaluation framework to develop mosquito sound detection models that are robust to real-world noise. The system focuses on training with realistic acoustic scenes using synthetic data that combines clean mosquito wingbeat recordings with environmental noise.
+This project presents a simulation-based training and evaluation framework to develop mosquito sound detection models robust to real-world noise. The system focuses on training with realistic acoustic scenes using synthetic data that combines clean mosquito wingbeat recordings with environmental noise.
 
 ---
 
@@ -13,7 +13,7 @@ To develop and evaluate mosquito detection models that perform reliably under en
 ## 📁 Datasets
 
 ### 🦟 Wingbeat Dataset
-- Sources: [HumBugDB]([https://humbug.ac.uk/](https://github.com/HumBug-Mosquito/HumBugDB)), [MosquitoSong+]([https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0310121]))
+- Sources: [HumBugDB]([https://humbug.ac.uk/](https://github.com/HumBug-Mosquito/HumBugDB), [MosquitoSong+]([https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0310121])
 - Species:  
   - *Aedes aegypti*, *Culex quinquefasciatus* (Urban)  
   - *Aedes albopictus*, *Anopheles dirus* (Forest)
